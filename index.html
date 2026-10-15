@@ -1143,6 +1143,11 @@ function floorAt(x,z,fromY){wray.set(new V3(x,fromY,z),DOWN);wray.far=60;const h
 /* rutas: jardín (0) ↔ plataforma (1) ↔ interior (2), pasando por la escalera y la puerta */
 const STAIR_LO=new V3(0,0,PLZ+47.5+16),STAIR_HI=new V3(0,PLH,PLZ+45),DOOR_OUT=new V3(0,PLH,PLZ+H+2.5),DOOR_IN=new V3(0,PLH,PLZ+RI-.8);
 function zoneOf(x,y,z){if(y<PLH-1.5)return 0;if(Math.hypot(x,z-PLZ)<R+.3||(Math.abs(x)<2.2&&z>PLZ&&z<PLZ+H+.3))return 2;return 1;}
+/* recinto de la celosía: nadie entra; si alguien queda dentro, se le saca al pasillo de alrededor */
+const JALI_OUT=5.5;
+function insideJali(x,y,z){return y>PLH-1.5&&y<PLH+3&&Math.hypot(x,z-PLZ)<JALI_OUT;}
+function pushOutOfJali(p,feet){const dx=p.x,dz=p.z-PLZ;if(!insideJali(p.x,feet,p.z))return;
+  const l=Math.hypot(dx,dz);const ux=l>.3?dx/l:0,uz=l>.3?dz/l:1;p.x=ux*(JALI_OUT+.3);p.z=PLZ+uz*(JALI_OUT+.3);}
 function inChamber(p){return p.y>PLH-1.5&&Math.hypot(p.x,p.z-PLZ)<R+.3;}
 function jaliDetour(a,b,out){ // rodea la celosía si la línea recta la cruza
   if(!inChamber(a)||!inChamber(b))return;
@@ -1166,7 +1171,7 @@ function startWalk(id){
   walkEl.hidden=false;joy.hidden=!coarse;document.body.classList.add('walk-on');hideHint();
   $('#walkHelp').textContent=coarse?'Toca el piso para ir hasta allí. También puedes usar el círculo y arrastrar para mirar.':'Haz clic en el piso para ir hasta allí. Arrastra para mirar. También: W A S D o flechas, Shift para correr.';
   camera.fov=62;camera.updateProjectionMatrix();camera.rotation.order='YXZ';if(id)teleport(id);}
-function startWalkAt(x,f,z,yaw,pitch){startWalk(null);W.dest=null;W.feet=f;W.yaw=yaw;W.pitch=pitch;camera.position.set(x,f+1.7,z);markView('walk');}
+function startWalkAt(x,f,z,yaw,pitch){startWalk(null);W.dest=null;W.feet=f;W.yaw=yaw;W.pitch=pitch;camera.position.set(x,f+1.7,z);pushOutOfJali(camera.position,f);markView('walk');}
 /* ir caminando hacia un punto tocado en el piso (estilo Street View) */
 const destRing=new THREE.Mesh(new THREE.RingGeometry(.38,.55,40),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
 destRing.rotation.x=-Math.PI/2;destRing.renderOrder=5;scene.add(destRing);
@@ -1214,6 +1219,7 @@ function updateWalk(dt){
     const p=camera.position;
     if(!blocked(mv.x,mv.z)){p.x+=mv.x;p.z+=mv.z;}else if(!blocked(mv.x,0))p.x+=mv.x;else if(!blocked(0,mv.z))p.z+=mv.z;
     p.x=Math.max(-600,Math.min(600,p.x));p.z=Math.max(-268,Math.min(600,p.z));}
+  pushOutOfJali(camera.position,W.feet);
   const fy=floorAt(camera.position.x,camera.position.z,W.feet+1.4);
   if(fy!==null)W.feet+=(fy-W.feet)*Math.min(1,dt*(fy>W.feet?14:7));
   camera.position.y=W.feet+1.7;camera.rotation.set(W.pitch,W.yaw,0);
@@ -1261,6 +1267,7 @@ function isFloor(h){if(!h.face||h.object.isInstancedMesh)return false;
   const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);if(n.y<.75)return false;
   const mt=h.object.material,k=mt&&mt.userData&&mt.userData.key;if(k==='water'||k==='hedge')return false;
   const pid=h.object.userData.part;if(pid&&NOT_FLOOR.includes(pid))return false;
+  if(insideJali(h.point.x,h.point.y,h.point.z))return false; // el recinto de los cenotafios no se pisa
   return h.point.y>-.5&&h.point.y<PLH+.6;}
 function pickHit(cx,cy){const pid=pick(cx,cy);let h=lastHit;if(!h)return null;let floor=isFloor(h);
   // a través de la celosía: si detrás hay piso de la cámara (fuera del recinto), se puede ir allí
