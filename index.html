@@ -263,6 +263,7 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Water.js"></script>
 <script>
 (function(){
 'use strict';
@@ -406,6 +407,30 @@ const TX={};
  for(let i=0;i<500;i++){x.strokeStyle=Math.random()<.5?'rgba(255,255,255,.12)':'rgba(30,50,55,.12)';x.lineWidth=1+Math.random()*1.5;const px=Math.random()*256,py=Math.random()*256;
    x.beginPath();x.moveTo(px,py);x.quadraticCurveTo(px+8,py-2,px+16+Math.random()*14,py);x.stroke();}
  TX.river=tex(c,30,6);}
+// follaje: hojas sueltas en tonos claros (el color de cada copa lo pone la instancia)
+{const [c,x]=cvs(256,256);x.fillStyle='#a9b996';x.fillRect(0,0,256,256);
+ for(let i=0;i<2600;i++){const px=Math.random()*256,py=Math.random()*256,a=Math.random()*6.28,l=Math.random();
+   x.fillStyle=l<.3?'rgb(105,125,85)':l<.78?'rgb(190,210,160)':'rgb(240,250,215)';
+   for(const [ox,oy] of [[0,0],[256,0],[-256,0],[0,256],[0,-256]]){x.save();x.translate(px+ox,py+oy);x.rotate(a);x.beginPath();x.ellipse(0,0,2.3,5.2,0,0,7);x.fill();x.restore();}}
+ TX.leaves=tex(c,3,3);TX.hedgeLeaves=tex(c,6,1);}
+// ciprés: agujas verticales
+{const [c,x]=cvs(128,256);x.fillStyle='#a3b394';x.fillRect(0,0,128,256);
+ for(let i=0;i<1700;i++){const px=Math.random()*128,py=Math.random()*256,l=Math.random();
+   x.strokeStyle=l<.35?'#5d7050':l<.8?'#bccaa9':'#e4ecd4';x.lineWidth=1.5;x.beginPath();x.moveTo(px,py);x.lineTo(px+(Math.random()-.5)*4,py-6-Math.random()*7);x.stroke();}
+ TX.needles=tex(c,6,4);}
+// corteza
+{const [c,x]=cvs(64,128);x.fillStyle='#6b4d38';x.fillRect(0,0,64,128);
+ for(let i=0;i<70;i++){x.strokeStyle=Math.random()<.5?'rgba(35,22,14,.55)':'rgba(150,120,95,.35)';x.lineWidth=1+Math.random()*2;const px=Math.random()*64;
+   x.beginPath();x.moveTo(px,0);x.bezierCurveTo(px+(Math.random()-.5)*8,40,px+(Math.random()-.5)*8,90,px,128);x.stroke();}
+ TX.bark=tex(c,2,1);}
+// normales del agua: suma de ondas con frecuencias enteras (textura sin costuras)
+function waterNormals(){const N=256;const [c,x]=cvs(N,N);const img=x.createImageData(N,N);const WV=[];
+  for(let i=0;i<14;i++){let kx=Math.round((Math.random()*2-1)*(2+i*1.3)),ky=Math.round((Math.random()*2-1)*(2+i*1.3));if(!kx&&!ky)kx=1;WV.push([kx,ky,1/(1+i*.6),Math.random()*6.28]);}
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){let dx=0,dy=0;
+    for(const [kx,ky,a,p] of WV){const cs=Math.cos(2*Math.PI*(kx*i+ky*j)/N+p)*a;dx+=cs*kx;dy+=cs*ky;}
+    const nx=-dx*.03,ny=-dy*.03,l=Math.hypot(nx,ny,1),o=(j*N+i)*4;
+    img.data[o]=(nx/l*.5+.5)*255;img.data[o+1]=(ny/l*.5+.5)*255;img.data[o+2]=(1/l*.5+.5)*255;img.data[o+3]=255;}
+  x.putImageData(img,0,0);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;}
 function rep(t,n){const c=t.clone();c.needsUpdate=true;c.repeat.set(n,1);return c;}
 
 /* ---------- Materiales ---------- */
@@ -426,14 +451,14 @@ const BASE={
   water:{color:0x4a8aa8,roughness:.05,metalness:.2,transparent:true,opacity:.92},
   river:{color:0xffffff,map:TX.river,roughness:.2,metalness:.1},
   grass:{color:0xffffff,map:TX.grass,roughness:1},
-  hedge:{color:0x2f5a2a,roughness:.95},
+  hedge:{color:0x3a6a32,map:TX.hedgeLeaves,bumpMap:TX.hedgeLeaves,bumpScale:.05,roughness:.95},
   flower:{color:0xffffff,roughness:.8},
   pavingF:{color:0xffffff,map:TX.pavingF,roughness:.95},
   pavingT:{color:0xffffff,map:TX.pavingT,roughness:.95},
   path:{color:0xffffff,map:TX.paving,roughness:.95},
-  cypress:{color:0xffffff,roughness:.9},
-  tree:{color:0xffffff,roughness:.95},
-  trunk:{color:0x5c4030,roughness:1},
+  cypress:{color:0xffffff,map:TX.needles,bumpMap:TX.needles,bumpScale:.06,roughness:.9},
+  tree:{color:0xffffff,map:TX.leaves,bumpMap:TX.leaves,bumpScale:.08,roughness:.95},
+  trunk:{color:0xffffff,map:TX.bark,bumpMap:TX.bark,bumpScale:.05,roughness:1},
   wood:{color:0xffffff,map:TX.door,roughness:.6},
   arcade:{color:0xffffff,map:TX.arcade,roughness:.5},
   floor:{color:0xd9d0c2,map:TX.floor,roughness:.2,envI:.7},
@@ -630,10 +655,13 @@ mesh('walls',box(300,1.4,1.2),'sand',0,.7,-269.6);
 /* ---------- Jardín ---------- */
 /* vegetación: copa orgánica (vértices desplazados de forma coherente) */
 let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
-const blobGeo=(()=>{const g=new THREE.IcosahedronGeometry(1,2);const a=g.attributes.position;
+// copa: esfera deformada con normales suaves (las de la esfera), para que no se vea facetada
+const makeBlob=detail=>{const g=new THREE.IcosahedronGeometry(1,detail);const a=g.attributes.position,nr=g.attributes.normal;
   for(let i=0;i<a.count;i++){const x=a.getX(i),y=a.getY(i),z=a.getZ(i);
-    const n=1+.16*Math.sin(x*5.1+y*3.3)*Math.cos(z*4.7-y*2.1)+.08*Math.sin(x*11+z*9);a.setXYZ(i,x*n,y*n*.92,z*n);}
-  g.computeVertexNormals();return g;})();
+    const n=1+.16*Math.sin(x*5.1+y*3.3)*Math.cos(z*4.7-y*2.1)+.06*Math.sin(x*11+z*9);a.setXYZ(i,x*n,y*n*.92,z*n);
+    const l=Math.hypot(x,y,z)||1;nr.setXYZ(i,x/l,y/l,z/l);}
+  return g;};
+const blobGeo=makeBlob(2),blobGeoHi=makeBlob(3);
 const cypressGeo=(()=>{const P=[[0,0],[.75,.5],[1.15,2.2],[1.2,4.2],[1.02,6.4],[.7,8.2],[.32,9.6],[0,10.3]];
   const g=new THREE.LatheGeometry(P.map(p=>new THREE.Vector2(p[0],p[1])),10);const a=g.attributes.position;
   for(let i=0;i<a.count;i++){const x=a.getX(i),y=a.getY(i),z=a.getZ(i);const n=1+.1*Math.sin(y*5+Math.atan2(z,x)*3);a.setX(i,x*n);a.setZ(i,z*n);}
@@ -643,15 +671,19 @@ function treeSet(list,pid,parent){ // list: [x,z,size]
   const blobs=[],trunks=[],cols=[];
   list.forEach(([x,z,s])=>{trunks.push(new THREE.Matrix4().compose(new V3(x,s*.75,z),new THREE.Quaternion(),new V3(s*.12,s*1.5,s*.12)));
     const base=new THREE.Color(GREENS[(rnd()*GREENS.length)|0]);
-    for(let k=0;k<4;k++){const r=s*(.55+rnd()*.35);const ox=(rnd()-.5)*s*.9,oz=(rnd()-.5)*s*.9,oy=s*1.45+rnd()*s*.7+(k===3?s*.35:0);
+    const nb=pid?7:4; // copas del jardín más frondosas (más grupos de hojas, más pequeños)
+    for(let k=0;k<nb;k++){const r=s*(pid?.42+rnd()*.3:.55+rnd()*.35);const ox=(rnd()-.5)*s*.9,oz=(rnd()-.5)*s*.9,oy=s*1.45+rnd()*s*.7+(k===3?s*.35:0);
       const q=new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd()*3,rnd()*3,rnd()*3));
       blobs.push(new THREE.Matrix4().compose(new V3(x+ox,oy,z+oz),q,new V3(r,r,r)));
-      cols.push(base.clone().offsetHSL((rnd()-.5)*.03,0,(rnd()-.5)*.08));}});
+      // las copas altas reciben más sol: un poco más claras y amarillentas
+      const up=(oy-s*1.45)/(s*1.05);cols.push(base.clone().offsetHSL((rnd()-.5)*.03+up*.015,0,(rnd()-.5)*.08+up*.05));}});
   const tm=new THREE.InstancedMesh(new THREE.CylinderGeometry(.6,1,1,6),pid?M(pid,'trunk'):sceneMats.trunk,trunks.length);trunks.forEach((m,i)=>tm.setMatrixAt(i,m));
-  const bm=new THREE.InstancedMesh(blobGeo,pid?M(pid,'tree'):sceneMats.tree,blobs.length);blobs.forEach((m,i)=>{bm.setMatrixAt(i,m);bm.setColorAt(i,cols[i]);});
-  [tm,bm].forEach(m=>{if(pid){m.userData.part=pid;pickables.push(m);}(parent||scene).add(m);});
+  const bm=new THREE.InstancedMesh(pid?blobGeoHi:blobGeo,pid?M(pid,'tree'):sceneMats.tree,blobs.length);blobs.forEach((m,i)=>{bm.setMatrixAt(i,m);bm.setColorAt(i,cols[i]);});
+  // el bosque exterior va en la capa 1: se ve, pero no se dibuja en los reflejos del agua (más rápido)
+  [tm,bm].forEach(m=>{if(pid){m.userData.part=pid;pickables.push(m);}else m.layers.set(1);(parent||scene).add(m);});
 }
-const sceneMats={trunk:new THREE.MeshStandardMaterial({color:0x5c4030,roughness:1}),tree:new THREE.MeshStandardMaterial({color:0xffffff,roughness:.95})};
+const sceneMats={trunk:new THREE.MeshStandardMaterial({color:0xffffff,map:TX.bark,roughness:1}),tree:new THREE.MeshStandardMaterial({color:0xffffff,map:TX.leaves,bumpMap:TX.leaves,bumpScale:.08,roughness:.95})};
+camera.layers.enable(1);sun.shadow.camera.layers.enable(1);
 
 part('garden','garden');
 {const p=mesh('garden',new THREE.PlaneGeometry(298,298),'path',0,.04,0);p.rotation.x=-Math.PI/2;
@@ -705,6 +737,23 @@ part('tank','tank');
  mesh('tank',cyl(1.2,1.5,.6,16),'marble',0,1.2,0);
  [[0,0],[5,5],[-5,5],[5,-5],[-5,-5]].forEach(([x,z])=>jets.push([x,1.3,z]));}
 
+/* agua con reflejos reales (THREE.Water): estanque, canales y río.
+   Las superficies originales quedan invisibles pero siguen sirviendo para tocar y ver la ficha. */
+const waters=[];
+if(THREE.Water){
+  const WN=waterNormals(),WRES=matchMedia('(pointer: coarse)').matches?256:512;let reflecting=false;
+  const mk=(geo,y,z,size,dist,col)=>{const w=new THREE.Water(geo,{textureWidth:WRES,textureHeight:WRES,waterNormals:WN,
+      sunDirection:sun.position.clone().normalize(),sunColor:0xfff0da,waterColor:col,distortionScale:dist,fog:true,alpha:1});
+    w.rotation.x=-Math.PI/2;w.position.set(0,y,z);w.material.uniforms.size.value=size;w.userData.col=col;w.userData.noShadow=true;
+    // sin reflejos dentro de reflejos: cada superficie se dibuja una sola vez por cuadro
+    const ob=w.onBeforeRender;w.onBeforeRender=function(r,s,c){if(reflecting)return;reflecting=true;ob.call(this,r,s,c);reflecting=false;};
+    scene.add(w);waters.push(w);return w;};
+  const cs=new THREE.Shape();[[-3,-148],[3,-148],[3,-3],[148,-3],[148,3],[3,3],[3,148],[-3,148],[-3,3],[-148,3],[-148,-3],[-3,-3]].forEach(([x,y],i)=>i?cs.lineTo(x,y):cs.moveTo(x,y));
+  mk(new THREE.ShapeGeometry(cs),.12,0,22,.6,0x2c6272);
+  mk(new THREE.PlaneGeometry(20,20),1.02,0,22,.5,0x2c6272);
+  mk(new THREE.PlaneGeometry(1800,360),-3,-450,5,2.2,0x3d6a6e);
+  PARTS.canals.mats.water.visible=false;PARTS.tank.mats.water.visible=false;PARTS.river.mats.river.visible=false;
+}
 part('cypress','cypress');
 {const cm=[],cc=[];for(let z=22;z<=146;z+=10)for(const sz of[-1,1])for(const sx of[-1,1]){const h=.85+rnd()*.3;
    cm.push(new THREE.Matrix4().compose(new V3(sx*9.5,0,sz*z),new THREE.Quaternion().setFromAxisAngle(new V3(0,1,0),rnd()*6),new V3(h,h,h)));
@@ -974,6 +1023,7 @@ function setNight(n){night=n;$('#tNight').setAttribute('aria-pressed',n);
   hemi.color.set(n?0x5a6c9c:0xe3ecff);hemi.groundColor.set(n?0x101018:0x8a7258);hemi.intensity=n?.38:.66;
   sun.color.set(n?0xa9bcff:0xfff0da);sun.intensity=n?.5:1.05;sun.position.set(n?-180:160,n?280:240,(n?160:260)-40);skyMat.uniforms.sunDir.value.set(n?-180:160,n?280:240,n?160:260).normalize();renderer.shadowMap.needsUpdate=true;sceneMats.tree.color.set(n?0x9aa6c0:0xffffff);
   fill.intensity=n?.08:.25;lampLight.intensity=n?1.6:1.1;
+  for(const w of waters){const u=w.material.uniforms;u.sunColor.value.set(n?0x5a6890:0xfff0da);u.sunDirection.value.copy(sun.position).normalize();u.waterColor.value.set(n?0x0b1b28:w.userData.col);}
   groundMat.color.set(n?0x5f6070:0xffffff);
   Object.values(PARTS).forEach(P=>Object.values(P.mats).forEach(m=>{if(MARBLE_KEYS.includes(m.userData.key)){m.userData.base.set(n?0x1d2236:0x000000);if(!sel||sel.pid!==P.id)m.emissive.copy(m.userData.base);}}));
 }
@@ -1258,6 +1308,7 @@ function loop(now){
   else if(mode==='walk')updateWalk(dt);
   // puertas
   const dk0=doorK;doorK+=((doorOpen?1:0)-doorK)*Math.min(1,dt*3);if(Math.abs(doorK-dk0)>1e-4)renderer.shadowMap.needsUpdate=true;
+  for(const w of waters)w.material.uniforms.time.value=now/1000*.35;
   TX.river.offset.x=(now/1000)*.012;TX.river.offset.y=(now/1000)*.004;
   doorL.rotation.y=-doorK*1.75;doorR.rotation.y=doorK*1.75;
   // fuentes
