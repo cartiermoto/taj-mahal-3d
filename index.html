@@ -996,8 +996,13 @@ const VIEWS={
 function hideWelcome(){$('#welcome').hidden=true;}
 $('#wTour').onclick=()=>setView('tour');
 $('#wFree').onclick=()=>setView('walk');
+/* "Arriba" estando dentro: vista desde lo alto de la cúpula interior hacia los cenotafios */
+function topInside(){setInside(true);controls.maxDistance=14;controls.maxPolarAngle=.55;markView('top');
+  flyTo([0,PLH+13.5,PLZ+4],[-1.4,PLH+.6,PLZ],1.8);}
 function setView(v){
   hideWelcome();
+  if(v==='top'&&(inside||(mode==='walk'&&zoneOf(camera.position.x,W.feet,camera.position.z)===2)||(mode==='tour'&&zoneOf(camera.position.x,camera.position.y-1.7,camera.position.z)===2))){
+    if(mode==='tour')endTour(false);if(mode==='walk')exitWalk();topInside();return;}
   if(mode==='tour')endTour(false);
   if(mode==='walk')exitWalk();
   if(v==='walk'){document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v==='walk'));startWalk('gate');return;}
