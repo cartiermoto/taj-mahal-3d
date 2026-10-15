@@ -85,7 +85,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidde
   bottom:calc(env(safe-area-inset-bottom,0px) + 76px);width:min(380px,calc(100% - 32px));overflow:auto;padding:0;
   transform:translateX(0);opacity:1;transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .25s}
 #ficha.hide{transform:translateX(30px);opacity:0;pointer-events:none}
-#ficha .photo{position:relative;margin:10px 10px 0;border-radius:10px;overflow:hidden;aspect-ratio:16/10;background:var(--chip);max-width:100%}
+#ficha .photo{position:relative;margin:10px 10px 0;border-radius:10px;overflow:hidden;height:110px;background:var(--chip);max-width:100%}
 #ficha .photo img{width:100%;height:100%;object-fit:cover;display:block}
 #ficha .photo figcaption{position:absolute;left:8px;bottom:8px;font:600 .68rem var(--body);letter-spacing:.08em;text-transform:uppercase;background:rgba(20,14,10,.6);color:#fff;padding:4px 7px;border-radius:6px}
 #ficha .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);transform:translateX(-120%);pointer-events:none}
@@ -134,6 +134,11 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
 #knob{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;background:var(--accent);box-shadow:0 4px 12px rgba(0,0,0,.25);pointer-events:none}
 #hint{position:fixed;z-index:4;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);padding:9px 14px;font-size:.84rem;transition:opacity .6s;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
 #hint.hide{opacity:0;pointer-events:none}
+#welcome{position:fixed;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,calc(100% - 32px));padding:18px 20px;display:flex;flex-direction:column;gap:10px;text-align:center}
+#welcome .step{font:700 .7rem var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+#welcome h2{margin:0;font-family:var(--display);font-size:1.35rem;font-weight:500}
+#welcome p{margin:0;font-size:.92rem}
+#welcome .tctl{justify-content:center;margin-top:4px}
 #loader{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:var(--bg);font-family:var(--display);font-size:1.2rem;letter-spacing:.1em;transition:opacity .6s}
 #loader.hide{opacity:0;pointer-events:none}
 
@@ -147,7 +152,7 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
     bottom:calc(env(safe-area-inset-bottom,0px) + 70px);max-height:60%}
   #ficha.hide{transform:translateY(30px)}
   #fName{font-size:1.35rem}
-  #ficha .photo{aspect-ratio:16/8}
+  #ficha .photo{height:84px}
   #tour{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 70px);padding:12px 14px}
   #tour p{font-size:.85rem}
   #views{gap:1px;padding:4px}
@@ -185,7 +190,7 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
 </header>
 
 <nav id="views" class="plaque" aria-label="Vistas">
-  <button class="vbtn on" data-v="3d">3D</button>
+  <button class="vbtn" data-v="3d">3D</button>
   <button class="vbtn" data-v="front">Frente</button>
   <button class="vbtn" data-v="top">Arriba</button>
   <button class="vbtn" data-v="side">Lado</button>
@@ -194,6 +199,15 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
   <button class="vbtn tour" data-v="tour">▶ <span class="long">Recorrido</span><span class="short">Guía</span></button>
 </nav>
 
+<section id="welcome" class="plaque" hidden aria-live="polite">
+  <div class="step">Bienvenido · Gran Puerta</div>
+  <h2>Estás en la entrada a los jardines</h2>
+  <p>¿Cómo quieres visitar el Taj Mahal?</p>
+  <div class="tctl">
+    <button class="tbtn main" id="wTour">▶ Recorrido guiado</button>
+    <button class="tbtn" id="wFree">Explorar por mi cuenta</button>
+  </div>
+</section>
 <div id="tip"></div>
 <div id="hint" class="plaque">Toca el piso para caminar hasta allí · Toca una parte para ver su ficha</div>
 
@@ -979,7 +993,11 @@ const VIEWS={
   side:{p:[285,34,-210],t:[0,28,-210]},
   inside:{p:[0,PLH+1.7,PLZ+7.6],t:[0,PLH+.5,PLZ-2]},
 };
+function hideWelcome(){$('#welcome').hidden=true;}
+$('#wTour').onclick=()=>setView('tour');
+$('#wFree').onclick=()=>setView('walk');
 function setView(v){
+  hideWelcome();
   if(mode==='tour')endTour(false);
   if(mode==='walk')exitWalk();
   if(v==='walk'){document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v==='walk'));startWalk('gate');return;}
@@ -1067,8 +1085,27 @@ const W={feet:0,yaw:0,pitch:0,keys:{},jx:0,jy:0,look:null};
 const TP={gate:{x:0,z:236,f:0,pitch:.12},garden:{x:30,z:60,f:0,pitch:.05,yaw:.35},door:{x:0,z:PLZ+H+11,f:PLH,pitch:.25,door:true},inside:{x:0,z:PLZ+7.6,f:PLH,pitch:-.12,door:true},exit:{x:0,z:PLZ+H+16,f:PLH,pitch:.05,yaw:Math.PI,door:true}};
 const wray=new THREE.Raycaster();const DOWN=new V3(0,-1,0);
 function floorAt(x,z,fromY){wray.set(new V3(x,fromY,z),DOWN);wray.far=60;const h=wray.intersectObjects(floors,false);return h.length?h[0].point.y:null;}
+/* rutas: jardín (0) ↔ plataforma (1) ↔ interior (2), pasando por la escalera y la puerta */
+const STAIR_LO=new V3(0,0,PLZ+47.5+16),STAIR_HI=new V3(0,PLH,PLZ+45),DOOR_OUT=new V3(0,PLH,PLZ+H+2.5),DOOR_IN=new V3(0,PLH,PLZ+RI-.8);
+function zoneOf(x,y,z){if(y<PLH-1.5)return 0;if(Math.hypot(x,z-PLZ)<R+.3||(Math.abs(x)<2.2&&z>PLZ&&z<PLZ+H+.3))return 2;return 1;}
+function inChamber(p){return p.y>PLH-1.5&&Math.hypot(p.x,p.z-PLZ)<R+.3;}
+function jaliDetour(a,b,out){ // rodea la celosía si la línea recta la cruza
+  if(!inChamber(a)||!inChamber(b))return;
+  const ax=a.x,az=a.z-PLZ,dx=b.x-a.x,dz=b.z-a.z,L2=dx*dx+dz*dz||1;const t=Math.max(0,Math.min(1,-(ax*dx+az*dz)/L2));
+  if(Math.hypot(ax+dx*t,az+dz*t)>5.4)return;
+  const aa=Math.atan2(az,ax),ab=Math.atan2(b.z-PLZ,b.x);let d=ab-aa;d=Math.atan2(Math.sin(d),Math.cos(d));
+  const n=Math.max(1,Math.ceil(Math.abs(d)/(Math.PI/4)));
+  for(let i=0;i<=n;i++){const g=aa+d*i/n;out.push(new V3(Math.cos(g)*7,PLH,PLZ+Math.sin(g)*7));}}
+function planRoute(a,b){
+  const za=zoneOf(a.x,a.y,a.z),zb=zoneOf(b.x,b.y,b.z);const pts=[];let cur=a;
+  const add=p=>{jaliDetour(cur,p,pts);pts.push(p);cur=p;};
+  if(za<zb){if(za===0){add(STAIR_LO);add(STAIR_HI);}if(zb===2){add(DOOR_OUT);add(DOOR_IN);}}
+  else if(za>zb){if(za===2){add(DOOR_IN);add(DOOR_OUT);}if(zb===0){add(STAIR_HI);add(STAIR_LO);}}
+  add(new V3(b.x,b.y,b.z));return pts;}
+function walkTo(pt){const pts=planRoute(new V3(camera.position.x,W.feet,camera.position.z),pt);W.dest=pts.shift();W.path=pts;W.stuck=0;placeRing(pt,'dest');
+  if(zoneOf(pt.x,pt.y,pt.z)===2||zoneOf(camera.position.x,W.feet,camera.position.z)===2)setDoor(true);}
 function markView(v){document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v===v));}
-function teleport(id){const t=TP[id];W.dest=null;W.feet=t.f;W.yaw=t.yaw||0;W.pitch=t.pitch;camera.position.set(t.x,t.f+1.7,t.z);if(t.door)setDoor(true);}
+function teleport(id){const t=TP[id];W.dest=null;W.path=null;W.feet=t.f;W.yaw=t.yaw||0;W.pitch=t.pitch;camera.position.set(t.x,t.f+1.7,t.z);if(t.door)setDoor(true);}
 function startWalk(id){
   closeFicha();tween=null;mode='walk';controls.enabled=false;setInside(false);
   walkEl.hidden=false;joy.hidden=!coarse;document.body.classList.add('walk-on');hideHint();
@@ -1076,21 +1113,26 @@ function startWalk(id){
   camera.fov=62;camera.updateProjectionMatrix();camera.rotation.order='YXZ';if(id)teleport(id);}
 function startWalkAt(x,f,z,yaw,pitch){startWalk(null);W.dest=null;W.feet=f;W.yaw=yaw;W.pitch=pitch;camera.position.set(x,f+1.7,z);markView('walk');}
 /* ir caminando hacia un punto tocado en el piso (estilo Street View) */
-const FLOOR_PARTS=['garden','terrace','plinth','chamber'];
 const destRing=new THREE.Mesh(new THREE.RingGeometry(.38,.55,40),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));
 destRing.rotation.x=-Math.PI/2;destRing.renderOrder=5;scene.add(destRing);
 destRing.add(new THREE.Mesh(new THREE.CircleGeometry(.16,24),destRing.material));
 let ringMode='off',ringT=0;
 function placeRing(pt,m){destRing.position.set(pt.x,pt.y+.04,pt.z);ringMode=m;ringT=performance.now();}
 function goTo(pt){
-  closeFicha();
-  if(mode==='walk'){W.dest=new V3(pt.x,pt.y,pt.z);W.stuck=0;placeRing(pt,'dest');return;}
+  closeFicha();hideWelcome();
+  if(mode==='walk'){walkTo(pt);return;}
   const dx=pt.x-camera.position.x,dz=pt.z-camera.position.z;const l=Math.hypot(dx,dz)||1;const yaw=Math.atan2(-dx/l,-dz/l);
-  if(inside){startWalkAt(camera.position.x,PLH,camera.position.z,yaw,-.1);W.dest=new V3(pt.x,pt.y,pt.z);placeRing(pt,'dest');return;}
+  if(inside){startWalkAt(camera.position.x,PLH,camera.position.z,yaw,-.1);walkTo(pt);return;}
   placeRing(pt,'dest');
-  const back=Math.min(6,l*.2);
-  flyTo([pt.x-dx/l*back,pt.y+1.7,pt.z-dz/l*back],[pt.x+dx/l*20,pt.y+1.2,pt.z+dz/l*20],reduce?.3:2.2,()=>{
-    startWalkAt(pt.x-dx/l*back,pt.y,pt.z-dz/l*back,yaw,-.05);W.dest=new V3(pt.x,pt.y,pt.z);W.stuck=0;placeRing(pt,'dest');});
+  // al interior se entra volando hasta la puerta y luego caminando
+  if(zoneOf(pt.x,pt.y,pt.z)===2){setDoor(true);const s=DOOR_OUT;
+    flyTo([s.x,PLH+1.7,s.z],[pt.x,PLH+1.2,pt.z],reduce?.3:2.2,()=>{startWalkAt(s.x,PLH,s.z,0,-.05);walkTo(pt);});return;}
+  // punto de llegada un poco antes del destino, pero en el mismo nivel (no fuera de la plataforma)
+  let back=Math.min(6,l*.2);const fy=floorAt(pt.x-dx/l*back,pt.z-dz/l*back,pt.y+2);
+  if(fy===null||Math.abs(fy-pt.y)>.5)back=0;
+  const sx=pt.x-dx/l*back,sz=pt.z-dz/l*back;
+  flyTo([sx,pt.y+1.7,sz],[pt.x+dx/l*20,pt.y+1.2,pt.z+dz/l*20],reduce?.3:2.2,()=>{
+    startWalkAt(sx,pt.y,sz,yaw,-.05);walkTo(pt);});
 }
 function exitWalk(){
   if(mode!=='walk')return;mode='orbit';controls.enabled=true;walkEl.hidden=true;joy.hidden=true;document.body.classList.remove('walk-on');
@@ -1099,17 +1141,17 @@ function exitWalk(){
 $('#wExit').onclick=exitWalk;
 document.querySelectorAll('[data-tp]').forEach(b=>b.onclick=()=>teleport(b.dataset.tp));
 function blocked(dx,dz){const len=Math.hypot(dx,dz);if(len<1e-6)return false;const d=new V3(dx/len,0,dz/len);
-  const p=camera.position;for(const hgt of[.9,1.55]){wray.set(new V3(p.x,W.feet+hgt,p.z),d);wray.far=len+.45;if(wray.intersectObjects(collide,false).length)return true;}return false;}
+  const p=camera.position;for(const hgt of[1.3,1.6]){wray.set(new V3(p.x,W.feet+hgt,p.z),d);wray.far=len+.45;if(wray.intersectObjects(collide,false).length)return true;}return false;}
 function updateWalk(dt){
   const k=W.keys;let f=W.jy,s=W.jx;
   if(k.KeyW||k.ArrowUp)f+=1;if(k.KeyS||k.ArrowDown)f-=1;if(k.KeyA)s-=1;if(k.KeyD)s+=1;
-  if((f||s)&&W.dest){W.dest=null;ringMode='fade';ringT=performance.now();}
-  if(W.dest){const dx=W.dest.x-camera.position.x,dz=W.dest.z-camera.position.z,l=Math.hypot(dx,dz);
-    if(l<.35){W.dest=null;ringMode='fade';ringT=performance.now();}
+  if((f||s)&&W.dest){W.dest=null;W.path=null;ringMode='fade';ringT=performance.now();}
+  if(W.dest){const dx=W.dest.x-camera.position.x,dz=W.dest.z-camera.position.z,l=Math.hypot(dx,dz);const more=W.path&&W.path.length;
+    if(l<(more?.9:.35)){if(more){W.dest=W.path.shift();W.stuck=0;}else{W.dest=null;ringMode='fade';ringT=performance.now();}}
     else{const want=Math.atan2(-dx,-dz);let da=want-W.yaw;da=Math.atan2(Math.sin(da),Math.cos(da));W.yaw+=da*Math.min(1,dt*3.5);
       const step=Math.min(l,4.5*(l>25?2:1)*dt);const p=camera.position,ox=p.x,oz=p.z,mx=dx/l*step,mz=dz/l*step;
       if(!blocked(mx,mz)){p.x+=mx;p.z+=mz;}else if(!blocked(mx,0))p.x+=mx;else if(!blocked(0,mz))p.z+=mz;
-      if(Math.hypot(p.x-ox,p.z-oz)<step*.2){W.stuck=(W.stuck||0)+dt;if(W.stuck>.5){W.dest=null;ringMode='fade';ringT=performance.now();}}else W.stuck=0;}}
+      if(Math.hypot(p.x-ox,p.z-oz)<step*.2){W.stuck=(W.stuck||0)+dt;if(W.stuck>.5){W.dest=null;W.path=null;ringMode='fade';ringT=performance.now();}}else W.stuck=0;}}
   if(k.ArrowLeft)W.yaw+=dt*1.8;if(k.ArrowRight)W.yaw-=dt*1.8;
   const sp=4.5*((k.ShiftLeft||k.ShiftRight)?2.2:1)*(coarse?1.3:1);
   if(f||s){const fw=new V3(-Math.sin(W.yaw),0,-Math.cos(W.yaw)),rt=new V3(Math.cos(W.yaw),0,-Math.sin(W.yaw));
@@ -1117,7 +1159,7 @@ function updateWalk(dt){
     const p=camera.position;
     if(!blocked(mv.x,mv.z)){p.x+=mv.x;p.z+=mv.z;}else if(!blocked(mv.x,0))p.x+=mv.x;else if(!blocked(0,mv.z))p.z+=mv.z;
     p.x=Math.max(-600,Math.min(600,p.x));p.z=Math.max(-268,Math.min(600,p.z));}
-  const fy=floorAt(camera.position.x,camera.position.z,W.feet+.7);
+  const fy=floorAt(camera.position.x,camera.position.z,W.feet+1.4);
   if(fy!==null)W.feet+=(fy-W.feet)*Math.min(1,dt*(fy>W.feet?14:7));
   camera.position.y=W.feet+1.7;camera.rotation.set(W.pitch,W.yaw,0);
   if(!doorOpen&&Math.hypot(camera.position.x,camera.position.z-(PLZ+H))<10)setDoor(true);
@@ -1156,12 +1198,19 @@ function pick(cx,cy){
   const hits=ray.intersectObjects(pickables.concat(extraFloors,[ground,farBank]),false);if(!hits.length){lastHit=null;return null;}
   let h=hits[0];
   if(h.object.userData.part==='jali'){const nx=hits.find(x=>/^cen/.test(x.object.userData.part)&&x.distance-h.distance<7);if(nx)h=nx;}
-  lastHit=h;return h.object.userData.part||null;}
-let lastHit=null;
-function pickHit(cx,cy){const pid=pick(cx,cy);const h=lastHit;if(!h)return null;let floor=false;
-  if(h.face){const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);
-    floor=n.y>.75&&(!h.object.userData.part||FLOOR_PARTS.includes(h.object.userData.part))&&!h.object.isInstancedMesh;}
-  return {pid,point:h.point.clone(),floor};}
+  lastHit=h;lastHits=hits;return h.object.userData.part||null;}
+let lastHit=null,lastHits=[];
+// cualquier superficie horizontal a nivel del suelo, la plataforma o la cámara es caminable
+const NOT_FLOOR=['cenMM','cenSJ','jali','doors','river','walls'];
+function isFloor(h){if(!h.face||h.object.isInstancedMesh)return false;
+  const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);if(n.y<.75)return false;
+  const mt=h.object.material,k=mt&&mt.userData&&mt.userData.key;if(k==='water'||k==='hedge')return false;
+  const pid=h.object.userData.part;if(pid&&NOT_FLOOR.includes(pid))return false;
+  return h.point.y>-.5&&h.point.y<PLH+.6;}
+function pickHit(cx,cy){const pid=pick(cx,cy);let h=lastHit;if(!h)return null;let floor=isFloor(h);
+  // a través de la celosía: si detrás hay piso de la cámara (fuera del recinto), se puede ir allí
+  if(!floor&&h.object.userData.part==='jali'){const f=lastHits.find(x=>isFloor(x)&&Math.hypot(x.point.x,x.point.z-PLZ)>4.9);if(f){h=f;floor=true;}}
+  return {pid:floor?null:pid,point:h.point.clone(),floor};}
 const tip=$('#tip');let hoverQ=null;
 renderer.domElement.addEventListener('pointermove',e=>{
   if(e.pointerType!=='mouse')return;hoverQ=[e.clientX,e.clientY];});
@@ -1190,12 +1239,17 @@ const hint=$('#hint');function hideHint(){hint.classList.add('hide');}setTimeout
 /* ---------- Bucle ---------- */
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 let last=performance.now();
+/* la cámara nunca baja del suelo (ni de la plataforma): no se ve "por debajo" del modelo */
+function keepAboveGround(){const p=camera.position,t=controls.target;
+  const onPl=Math.abs(p.x)<48&&Math.abs(p.z-PLZ)<48;const minY=inside?PLH+.4:onPl?PLH+1.2:1.2;
+  if(t.y<(inside?PLH+.2:.5))t.y=inside?PLH+.2:.5;
+  if(p.y<minY){p.y=minY;camera.lookAt(t);}}
 function loop(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
   if(tween){const k=Math.min(1,(now-tween.s)/tween.d);const e=tween.easing(k);
     camera.position.lerpVectors(tween.p0,tween.p1,e);controls.target.lerpVectors(tween.t0,tween.t1,e);camera.lookAt(controls.target);
     if(k>=1){const cb=tween.onDone;tween=null;if(mode==='orbit')controls.update();if(cb)cb();}}
-  else if(mode==='orbit')controls.update();
+  else if(mode==='orbit'){controls.update();keepAboveGround();}
   else if(mode==='walk')updateWalk(dt);
   // puertas
   const dk0=doorK;doorK+=((doorOpen?1:0)-doorK)*Math.min(1,dt*3);if(Math.abs(doorK-dk0)>1e-4)renderer.shadowMap.needsUpdate=true;
@@ -1226,7 +1280,8 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(t=>{last=t;loop(t);$('#loader').classList.add('hide');
-  flyTo(VIEWS['3d'].p,VIEWS['3d'].t,reduce?.3:3.2);});
+  // todo empieza frente a la Gran Puerta, la entrada a los jardines
+  markView('');hideHint();$('#welcome').hidden=false;flyTo(TOUR[0].p,TOUR[0].l,reduce?.3:3.6);});
 })();
 </script>
 
