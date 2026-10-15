@@ -1033,9 +1033,9 @@ $('#tNight').onclick=()=>setNight(!night);
 let inside=false,tween=null,mode='orbit';
 function setInside(v){inside=v;controls.maxDistance=v?8.2:900;controls.maxPolarAngle=v?Math.PI*.92:Math.PI/2-.03;controls.minDistance=v?.5:1;}
 const ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
-function flyTo(p,t,dur,onDone,easing=ease){
+function flyTo(p,t,dur,onDone,easing=ease,arc=0){
   if(reduce)dur=Math.min(dur,.35);
-  tween={p0:camera.position.clone(),t0:controls.target.clone(),p1:new V3(...p),t1:new V3(...t),s:performance.now(),d:dur*1000,onDone,easing};}
+  tween={p0:camera.position.clone(),t0:controls.target.clone(),p1:new V3(...p),t1:new V3(...t),s:performance.now(),d:dur*1000,onDone,easing,arc};}
 const VIEWS={
   '3d':{p:[175,105,-40],t:[0,26,-205]},
   front:{p:[0,16,70],t:[0,30,-210]},
@@ -1073,7 +1073,7 @@ document.querySelectorAll('.vbtn').forEach(b=>b.addEventListener('click',()=>set
 /* ---------- Recorrido ---------- */
 const EYE=1.7,UP=PLH+1.7;
 const TOUR=[
-  {p:[0,EYE,235],l:[0,16,158],stop:true,t:'Llegada a la Gran Puerta',d:'El recorrido empieza afuera, frente a la puerta de arenisca roja. Desde aquí todavía no se ve el mausoleo.',part:'gate'},
+  {p:[0,EYE,190],l:[0,9,120],stop:true,t:'Llegada a la Gran Puerta',d:'El recorrido empieza afuera, frente a la puerta de arenisca roja. Desde aquí todavía no se ve el mausoleo.',part:'gate'},
   {p:[0,EYE,170],l:[0,10,100]},
   {p:[0,EYE,158],l:[0,30,-210],stop:true,t:'Bajo el arco',d:'Al cruzar el arco aparece el mausoleo, enmarcado como un cuadro. Es un efecto pensado por los arquitectos.',part:'gate'},
   {p:[6.5,EYE+.5,136],l:[0,30,-210],stop:true,t:'El jardín Charbagh',d:'El jardín se divide en cuatro partes con canales de agua. Las filas de cipreses te guían hacia la tumba.',part:'garden'},
@@ -1137,12 +1137,13 @@ const coarse=matchMedia('(pointer: coarse)').matches;
 const collide=pickables.filter(m=>{const k=m.material&&m.material.userData&&m.material.userData.key;return k!=='lining'&&k!=='domeIn'&&k!=='hedge';});
 const floors=collide.concat([ground,farBank]);
 const W={feet:0,yaw:0,pitch:0,keys:{},jx:0,jy:0,look:null};
-const TP={gate:{x:0,z:236,f:0,pitch:.12},garden:{x:30,z:60,f:0,pitch:.05,yaw:.35},door:{x:0,z:PLZ+H+11,f:PLH,pitch:.25,door:true},inside:{x:0,z:PLZ+7.6,f:PLH,pitch:-.12,door:true},exit:{x:0,z:PLZ+H+16,f:PLH,pitch:.05,yaw:Math.PI,door:true}};
+const TP={gate:{x:0,z:188,f:0,pitch:.06},garden:{x:30,z:60,f:0,pitch:.05,yaw:.35},door:{x:0,z:PLZ+H+11,f:PLH,pitch:.25,door:true},inside:{x:0,z:PLZ+7.6,f:PLH,pitch:-.12,door:true},exit:{x:0,z:PLZ+H+16,f:PLH,pitch:.05,yaw:Math.PI,door:true}};
 const wray=new THREE.Raycaster();const DOWN=new V3(0,-1,0);
 function floorAt(x,z,fromY){wray.set(new V3(x,fromY,z),DOWN);wray.far=60;const h=wray.intersectObjects(floors,false);return h.length?h[0].point.y:null;}
 /* rutas: jardín (0) ↔ plataforma (1) ↔ interior (2), pasando por la escalera y la puerta */
-const STAIR_LO=new V3(0,0,PLZ+47.5+16),STAIR_HI=new V3(0,PLH,PLZ+45),DOOR_OUT=new V3(0,PLH,PLZ+H+2.5),DOOR_IN=new V3(0,PLH,PLZ+RI-.8);
-function zoneOf(x,y,z){if(y<PLH-1.5)return 0;if(Math.hypot(x,z-PLZ)<R+.3||(Math.abs(x)<2.2&&z>PLZ&&z<PLZ+H+.3))return 2;return 1;}
+const STAIR_LO=new V3(0,0,PLZ+62.3),STAIR_HI=new V3(0,PLH,PLZ+45),DOOR_OUT=new V3(0,PLH,PLZ+H+2.5),DOOR_IN=new V3(0,PLH,PLZ+RI-.8);
+function onStairs(x,z){return Math.abs(x)<4.6&&z>PLZ+47.4&&z<PLZ+61.4;}
+function zoneOf(x,y,z){if(onStairs(x,z))return .5;if(y<PLH-1.5)return 0;if(Math.hypot(x,z-PLZ)<R+.3||(Math.abs(x)<2.2&&z>PLZ&&z<PLZ+H+.3))return 2;return 1;}
 /* recinto de la celosía: nadie entra; si alguien queda dentro, se le saca al pasillo de alrededor */
 const JALI_OUT=5.5;
 function insideJali(x,y,z){return y>PLH-1.5&&y<PLH+3&&Math.hypot(x,z-PLZ)<JALI_OUT;}
@@ -1159,10 +1160,24 @@ function jaliDetour(a,b,out){ // rodea la celosía si la línea recta la cruza
 function planRoute(a,b){
   const za=zoneOf(a.x,a.y,a.z),zb=zoneOf(b.x,b.y,b.z);const pts=[];let cur=a;
   const add=p=>{jaliDetour(cur,p,pts);pts.push(p);cur=p;};
-  if(za<zb){if(za===0){add(STAIR_LO);add(STAIR_HI);}if(zb===2){add(DOOR_OUT);add(DOOR_IN);}}
-  else if(za>zb){if(za===2){add(DOOR_IN);add(DOOR_OUT);}if(zb===0){add(STAIR_HI);add(STAIR_LO);}}
+  // la escalera (.5) solo se toma de frente: desde abajo por STAIR_LO, desde arriba por STAIR_HI
+  if(za<zb){if(za===0)add(STAIR_LO);if(za<=.5&&zb>=1)add(STAIR_HI);if(zb===2){add(DOOR_OUT);add(DOOR_IN);}}
+  else if(za>zb){if(za===2){add(DOOR_IN);add(DOOR_OUT);}if(za>=1&&zb<=.5)add(STAIR_HI);if(zb===0)add(STAIR_LO);}
   add(new V3(b.x,b.y,b.z));return pts;}
-function walkTo(pt){const pts=planRoute(new V3(camera.position.x,W.feet,camera.position.z),pt);W.dest=pts.shift();W.path=pts;W.stuck=0;placeRing(pt,'dest');
+/* destino lejano: vuelo rápido en arco (por encima de muros y escaleras) y se sigue caminando allí */
+function glideTo(land,ringPt,done){
+  const p=camera.position,dx=land.x-p.x,dz=land.z-p.z,l=Math.hypot(dx,dz)||1;const yaw=Math.atan2(-dx,-dz);
+  W.dest=null;W.path=null;placeRing(ringPt,'dest');
+  const fw=new V3();camera.getWorldDirection(fw);controls.target.copy(p).addScaledVector(fw,10);
+  flyTo([land.x,land.y+1.7,land.z],[land.x+dx/l*30,land.y+1.5,land.z+dz/l*30],Math.min(2.4,.7+l/90),()=>{
+    W.feet=land.y;W.yaw=yaw;W.pitch=-.05;camera.rotation.set(W.pitch,W.yaw,0);
+    if(done)done();else{ringMode='fade';ringT=performance.now();}},ease,Math.min(30,l*.12));}
+function walkTo(pt){
+  const zt=zoneOf(pt.x,pt.y,pt.z),zh=zoneOf(camera.position.x,W.feet,camera.position.z);
+  const land=zt===2?DOOR_OUT:new V3(pt.x,pt.y,pt.z); // al interior se aterriza en la puerta y se entra caminando
+  if(zh!==2&&Math.hypot(land.x-camera.position.x,land.z-camera.position.z)>18){
+    if(zt===2){setDoor(true);glideTo(land,pt,()=>walkTo(pt));}else glideTo(land,pt);return;}
+  const pts=planRoute(new V3(camera.position.x,W.feet,camera.position.z),pt);W.dest=pts.shift();W.path=pts;W.stuck=0;placeRing(pt,'dest');
   if(zoneOf(pt.x,pt.y,pt.z)===2||zoneOf(camera.position.x,W.feet,camera.position.z)===2)setDoor(true);}
 function markView(v){document.querySelectorAll('.vbtn').forEach(b=>b.classList.toggle('on',b.dataset.v===v));}
 function teleport(id){const t=TP[id];W.dest=null;W.path=null;W.feet=t.f;W.yaw=t.yaw||0;W.pitch=t.pitch;camera.position.set(t.x,t.f+1.7,t.z);if(t.door)setDoor(true);}
@@ -1264,6 +1279,8 @@ let lastHit=null,lastHits=[];
 // cualquier superficie horizontal a nivel del suelo, la plataforma o la cámara es caminable
 const NOT_FLOOR=['cenMM','cenSJ','jali','doors','river','walls'];
 function isFloor(h){if(!h.face||h.object.isInstancedMesh)return false;
+  // escalones: también su frente cuenta como "ir aquí"
+  if(h.object.userData.part==='plinth'&&onStairs(h.point.x,h.point.z)&&h.point.y<PLH+.1)return true;
   const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);if(n.y<.75)return false;
   const mt=h.object.material,k=mt&&mt.userData&&mt.userData.key;if(k==='water'||k==='hedge')return false;
   const pid=h.object.userData.part;if(pid&&NOT_FLOOR.includes(pid))return false;
@@ -1309,7 +1326,9 @@ function keepAboveGround(){const p=camera.position,t=controls.target;
 function loop(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
   if(tween){const k=Math.min(1,(now-tween.s)/tween.d);const e=tween.easing(k);
-    camera.position.lerpVectors(tween.p0,tween.p1,e);controls.target.lerpVectors(tween.t0,tween.t1,e);camera.lookAt(controls.target);
+    camera.position.lerpVectors(tween.p0,tween.p1,e);controls.target.lerpVectors(tween.t0,tween.t1,e);
+    if(tween.arc){const a=Math.sin(Math.PI*e)*tween.arc;camera.position.y+=a;controls.target.y+=a*.6;}
+    camera.lookAt(controls.target);
     if(k>=1){const cb=tween.onDone;tween=null;if(mode==='orbit')controls.update();if(cb)cb();}}
   else if(mode==='orbit'){controls.update();keepAboveGround();}
   else if(mode==='walk')updateWalk(dt);
