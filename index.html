@@ -82,7 +82,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidde
 
 /* ficha */
 #ficha{position:fixed;z-index:6;right:max(16px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 86px);
-  bottom:calc(env(safe-area-inset-bottom,0px) + 76px);width:min(380px,calc(100% - 32px));overflow:auto;padding:0;
+  max-height:calc(100% - 162px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));width:min(380px,calc(100% - 32px));overflow:auto;padding:0;
   transform:translateX(0);opacity:1;transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .25s}
 #ficha.hide{transform:translateX(30px);opacity:0;pointer-events:none}
 #ficha .photo{position:relative;margin:10px 10px 0;border-radius:10px;overflow:hidden;height:110px;background:var(--chip);max-width:100%}
@@ -286,7 +286,10 @@ const ROOM_H=14.9;   // muros interiores; + cúpula 9,5 = 24,4 m
 /* ---------- Renderer ---------- */
 const stage=$('#stage');
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+// tablets y móviles: menos píxeles (la resolución se ajusta sola según la fluidez, ver bucle)
+const TOUCH=matchMedia('(pointer: coarse)').matches;
+const PR_MAX=Math.min(window.devicePixelRatio||1,TOUCH?1.25:1.75);let PR=PR_MAX;
+renderer.setPixelRatio(PR);
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;
 renderer.setSize(innerWidth,innerHeight);
 stage.appendChild(renderer.domElement);
@@ -680,9 +683,10 @@ function treeSet(list,pid,parent){ // list: [x,z,size]
       // las copas altas reciben más sol: un poco más claras y amarillentas
       const up=(oy-s*1.45)/(s*1.05);cols.push(base.clone().offsetHSL((rnd()-.5)*.03+up*.015,0,(rnd()-.5)*.08+up*.05));}});
   const tm=new THREE.InstancedMesh(new THREE.CylinderGeometry(.6,1,1,6),pid?M(pid,'trunk'):sceneMats.trunk,trunks.length);trunks.forEach((m,i)=>tm.setMatrixAt(i,m));
-  const bm=new THREE.InstancedMesh(pid?blobGeoHi:blobGeo,pid?M(pid,'tree'):sceneMats.tree,blobs.length);blobs.forEach((m,i)=>{bm.setMatrixAt(i,m);bm.setColorAt(i,cols[i]);});
+  const bm=new THREE.InstancedMesh(pid&&!TOUCH?blobGeoHi:blobGeo,pid?M(pid,'tree'):sceneMats.tree,blobs.length);blobs.forEach((m,i)=>{bm.setMatrixAt(i,m);bm.setColorAt(i,cols[i]);});
   // el bosque exterior va en la capa 1: se ve, pero no se dibuja en los reflejos del agua (más rápido)
   [tm,bm].forEach(m=>{if(pid){m.userData.part=pid;pickables.push(m);}else m.layers.set(1);(parent||scene).add(m);});
+  if(TOUCH)bm.layers.set(1); // en táctiles, las copas tampoco se dibujan en los reflejos
 }
 const sceneMats={trunk:new THREE.MeshStandardMaterial({color:0xffffff,map:TX.bark,roughness:1}),tree:new THREE.MeshStandardMaterial({color:0xffffff,map:TX.leaves,bumpMap:TX.leaves,bumpScale:.08,roughness:.95})};
 camera.layers.enable(1);sun.shadow.camera.layers.enable(1);
@@ -753,8 +757,8 @@ if(THREE.Water){
   const cs=new THREE.Shape();[[-3,-148],[3,-148],[3,-3],[148,-3],[148,3],[3,3],[3,148],[-3,148],[-3,3],[-148,3],[-148,-3],[-3,-3]].forEach(([x,y],i)=>i?cs.lineTo(x,y):cs.moveTo(x,y));
   mk(new THREE.ShapeGeometry(cs),.12,0,22,.6,0x2c6272);
   mk(new THREE.PlaneGeometry(20,20),1.02,0,22,.5,0x2c6272);
-  mk(new THREE.PlaneGeometry(1800,360),-3,-450,5,2.2,0x3d6a6e);
-  PARTS.canals.mats.water.visible=false;PARTS.tank.mats.water.visible=false;PARTS.river.mats.river.visible=false;
+  if(!TOUCH)mk(new THREE.PlaneGeometry(1800,360),-3,-450,5,2.2,0x3d6a6e); // en táctiles el río va sin reflejo (más fluido)
+  PARTS.canals.mats.water.visible=false;PARTS.tank.mats.water.visible=false;if(!TOUCH)PARTS.river.mats.river.visible=false;
 }
 part('cypress','cypress');
 {const cm=[],cc=[];for(let z=22;z<=146;z+=10)for(const sz of[-1,1])for(const sx of[-1,1]){const h=.85+rnd()*.3;
@@ -1138,7 +1142,7 @@ function backToOrbit(){
 /* ---------- Modo caminar ---------- */
 const walkEl=$('#walk'),joy=$('#joy'),knob=$('#knob');
 const coarse=matchMedia('(pointer: coarse)').matches;
-const collide=pickables.filter(m=>{const k=m.material&&m.material.userData&&m.material.userData.key;return k!=='lining'&&k!=='domeIn'&&k!=='hedge';});
+const collide=pickables.filter(m=>{const k=m.material&&m.material.userData&&m.material.userData.key;return k!=='lining'&&k!=='domeIn'&&k!=='hedge'&&k!=='tree';});
 const floors=collide.concat([ground,farBank]);
 const W={feet:0,yaw:0,pitch:0,keys:{},jx:0,jy:0,look:null};
 const TP={gate:{x:0,z:188,f:0,pitch:.06},garden:{x:30,z:60,f:0,pitch:.05,yaw:.35},door:{x:0,z:PLZ+H+11,f:PLH,pitch:.25,door:true},inside:{x:0,z:PLZ+7.6,f:PLH,pitch:-.12,door:true},exit:{x:0,z:PLZ+H+16,f:PLH,pitch:.05,yaw:Math.PI,door:true}};
@@ -1311,7 +1315,18 @@ function isFloor(h){if(!h.face||h.object.isInstancedMesh)return false;
 function pickHit(cx,cy){const pid=pick(cx,cy);let h=lastHit;if(!h)return null;let floor=isFloor(h);
   // a través de la celosía: si detrás hay piso de la cámara (fuera del recinto), se puede ir allí
   if(!floor&&h.object.userData.part==='jali'){const f=lastHits.find(x=>isFloor(x)&&Math.hypot(x.point.x,x.point.z-PLZ)>4.9);if(f){h=f;floor=true;}}
+  if(!floor){const ps=passage(h);if(ps)return {pid:null,point:ps.pt,floor:true,label:ps.label};}
   return {pid:floor?null:pid,point:h.point.clone(),floor};}
+/* caminando, tocar el arco de la Gran Puerta lo cruza y tocar la puerta del mausoleo te hace entrar
+   (desde la puerta casi toda la pantalla es arco: así no se abre la ficha cuando lo que quieres es avanzar) */
+function passage(h){if(mode!=='walk')return null;const p=h.point,pid=h.object.userData.part,c=camera.position;
+  if(pid==='gate'&&Math.abs(p.x)<7&&p.z>145&&p.z<171.5&&p.y<21)return {pt:new V3(0,.04,c.z>158?138:180),label:c.z>158?'Cruzar el arco':'Salir por el arco'};
+  if((pid==='doors'||(pid==='mausoleum'&&Math.abs(p.x)<8.5&&p.z>PLZ+H-2&&p.y<PLH+17))&&zoneOf(c.x,W.feet,c.z)!==2)
+    return {pt:new V3(INSIDE_SPOT[0],PLH,INSIDE_SPOT[2]),label:'Entrar'};
+  // la pared de la plataforma: ir a su pie (3 m antes, del lado desde donde miras)
+  if(pid==='plinth'&&p.y<PLH-.05&&!onStairs(p.x,p.z)){const dx=c.x-p.x,dz=c.z-p.z,l=Math.hypot(dx,dz)||1;
+    return {pt:new V3(p.x+dx/l*3,.04,p.z+dz/l*3),label:'Ir aquí'};}
+  return null;}
 const tip=$('#tip');let hoverQ=null;
 renderer.domElement.addEventListener('pointermove',e=>{
   if(e.pointerType!=='mouse')return;hoverQ=[e.clientX,e.clientY];});
@@ -1319,7 +1334,7 @@ renderer.domElement.addEventListener('pointerleave',()=>{tip.classList.remove('o
 function doHover(){if(!hoverQ)return;const [x,y]=hoverQ;hoverQ=null;
   if(mode==='tour'){tip.classList.remove('on');return;}
   const hh=pickHit(x,y);
-  if(hh&&hh.floor){tip.textContent='Ir aquí';tip.style.left=x+'px';tip.style.top=y+'px';tip.classList.add('on');renderer.domElement.style.cursor='pointer';if(ringMode!=='dest')placeRing(hh.point,'hover');return;}
+  if(hh&&hh.floor){tip.textContent=hh.label||'Ir aquí';tip.style.left=x+'px';tip.style.top=y+'px';tip.classList.add('on');renderer.domElement.style.cursor='pointer';if(ringMode!=='dest')placeRing(hh.point,'hover');return;}
   if(ringMode==='hover')ringMode='off';
   const pid=hh&&hh.pid;if(pid){tip.textContent=PARTS[pid].name;tip.style.left=x+'px';tip.style.top=y+'px';tip.classList.add('on');renderer.domElement.style.cursor='pointer';}
   else{tip.classList.remove('on');renderer.domElement.style.cursor='grab';}}
@@ -1340,13 +1355,22 @@ const hint=$('#hint');function hideHint(){hint.classList.add('hide');}setTimeout
 /* ---------- Bucle ---------- */
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 let last=performance.now();
+/* calidad adaptable: cada 2 s mide los cuadros por segundo; si va lento baja la resolución, si va sobrado la sube */
+let qT=0,qF=0,qGood=0;
+function adaptQuality(now){
+  if(!qT){qT=now;return;}qF++;const el=now-qT;if(el<2000)return;
+  const fps=qF*1000/el;qT=now;qF=0;if(document.hidden)return;
+  let np=PR;
+  if(fps<30&&PR>.6){np=Math.max(.6,PR-(fps<18?.3:.15));qGood=0;}
+  else if(fps>52&&PR<PR_MAX){if(++qGood>=3){np=Math.min(PR_MAX,PR+.1);qGood=0;}}else qGood=0;
+  if(np!==PR){PR=np;renderer.setPixelRatio(PR);renderer.setSize(innerWidth,innerHeight);}}
 /* la cámara nunca baja del suelo (ni de la plataforma): no se ve "por debajo" del modelo */
 function keepAboveGround(){const p=camera.position,t=controls.target;
   const onPl=Math.abs(p.x)<48&&Math.abs(p.z-PLZ)<48;const minY=inside?PLH+.4:onPl?PLH+1.2:1.2;
   if(t.y<(inside?PLH+.2:.5))t.y=inside?PLH+.2:.5;
   if(p.y<minY){p.y=minY;camera.lookAt(t);}}
 function loop(now){
-  const dt=Math.min(.05,(now-last)/1000);last=now;
+  const dt=Math.min(.1,(now-last)/1000);last=now;adaptQuality(now);
   if(tween){const k=Math.min(1,(now-tween.s)/tween.d);const e=tween.easing(k);
     camera.position.lerpVectors(tween.p0,tween.p1,e);controls.target.lerpVectors(tween.t0,tween.t1,e);
     if(tween.arc){const a=Math.sin(Math.PI*e)*tween.arc;camera.position.y+=a;controls.target.y+=a*.6;}
