@@ -705,15 +705,15 @@ part('garden','garden');
      mesh('garden',box(.9,.6,segd),'hedge',cx+bw/2-1,.6,cz+sgn*(3+segd/2));mesh('garden',box(.9,.6,segd),'hedge',cx-bw/2+1,.6,cz+sgn*(3+segd/2));}
    // franja de flores junto al seto
    const fc=FC[(rnd()*FC.length)|0],fc2=FC[(rnd()*FC.length)|0];
-   for(let t=-bw/2+3;t<=bw/2-3;t+=1.1)for(const side of[-1,1]){if(Math.abs(t)<4)continue;
+   for(let t=-bw/2+3;t<=bw/2-3;t+=.7)for(const side of[-1,1]){if(Math.abs(t)<4)continue;
      for(const [fx,fz] of [[cx+t,cz+side*(bd/2-2.1)],[cx+side*(bw/2-2.1),cz+t*(bd/bw)]]){
-       const r=.32+rnd()*.18;flowers.push(new THREE.Matrix4().compose(new V3(fx+(rnd()-.5)*.4,.45+r*.5,fz+(rnd()-.5)*.4),new THREE.Quaternion(),new V3(r,r*.8,r)));
+       const r=.17+rnd()*.1;flowers.push(new THREE.Matrix4().compose(new V3(fx+(rnd()-.5)*.5,.38+r*.5,fz+(rnd()-.5)*.5),new THREE.Quaternion(),new V3(r,r*.8,r)));
        fcols.push(new THREE.Color(rnd()<.5?fc:fc2));}}
    // árboles: uno grande por esquina interior y algunos sueltos
    for(let k=0;k<5;k++){const ex=cx+(rnd()-.5)*(bw-14),ez=cz+(rnd()-.5)*(bd-14);trees.push([ex,ez,3.2+rnd()*2.2]);}
  }
  treeSet(trees,'garden');
- const fm=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),M('garden','flower'),flowers.length);
+ const fm=new THREE.InstancedMesh(makeBlob(1),M('garden','flower'),flowers.length);
  flowers.forEach((m,i)=>{fm.setMatrixAt(i,m);fm.setColorAt(i,fcols[i]);});fm.userData.part='garden';fm.userData.noShadow=true;PARTS.garden.group.add(fm);
 }
 /* entorno fuera de los muros: bosque, explanada de entrada y orilla norte */
@@ -1316,7 +1316,23 @@ function pickHit(cx,cy){const pid=pick(cx,cy);let h=lastHit;if(!h)return null;le
   // a través de la celosía: si detrás hay piso de la cámara (fuera del recinto), se puede ir allí
   if(!floor&&h.object.userData.part==='jali'){const f=lastHits.find(x=>isFloor(x)&&Math.hypot(x.point.x,x.point.z-PLZ)>4.9);if(f){h=f;floor=true;}}
   if(!floor){const ps=passage(h);if(ps)return {pid:null,point:ps.pt,floor:true,label:ps.label};}
+  if(!floor){const g=groundLike(h);if(g)return {pid:null,point:g,floor:true};}
   return {pid:floor?null:pid,point:h.point.clone(),floor};}
+/* todo lo que está a ras de suelo (flores, setos, agua de canales y estanque, piso dentro de la celosía)
+   nunca abre una ficha: te lleva al punto pisable más cercano */
+function groundLike(h){const p=h.point.clone(),pid=h.object.userData.part,mt=h.object.material,k=mt&&mt.userData&&mt.userData.key;
+  if(pid==='cenMM'||pid==='cenSJ'||pid==='jali'||pid==='doors'||pid==='river')return null;
+  let up=false;if(h.face&&!h.object.isInstancedMesh){const n=h.face.normal.clone().transformDirection(h.object.matrixWorld);up=n.y>.6;}
+  const low=p.y<PLH+.6;
+  const flora=pid==='garden'&&p.y<1.6&&(h.object.isInstancedMesh||k==='hedge');
+  if(!(flora||(up&&low)))return null;
+  if(insideJali(p.x,p.y,p.z)){pushOutOfJali(p,p.y);p.y=PLH;return p;}
+  if(k==='water'){ // al paseo de al lado del agua
+    if(pid==='tank'||(Math.abs(p.x)<14&&Math.abs(p.z)<14)){const a=Math.atan2(p.z,p.x);p.x=Math.cos(a)*16;p.z=Math.sin(a)*16;}
+    else if(Math.abs(p.x)<4)p.x=(p.x<0?-1:1)*6.5;else p.z=(p.z<0?-1:1)*6.5;
+    p.y=.04;return p;}
+  if(flora)p.y=.04;
+  return p;}
 /* caminando, tocar el arco de la Gran Puerta lo cruza y tocar la puerta del mausoleo te hace entrar
    (desde la puerta casi toda la pantalla es arco: así no se abre la ficha cuando lo que quieres es avanzar) */
 function passage(h){if(mode!=='walk')return null;const p=h.point,pid=h.object.userData.part,c=camera.position;
