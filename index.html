@@ -111,6 +111,7 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
 .small{font-size:.76rem;color:var(--muted)}
 #closeF{position:absolute;top:18px;right:18px;z-index:2;width:34px;height:34px;border-radius:50%;border:0;background:rgba(20,14,10,.6);color:#fff;font-size:18px;cursor:pointer;line-height:1}
 .fbtn{font:700 .82rem var(--body);border:1px solid var(--line);background:transparent;color:var(--fg);padding:8px 12px;border-radius:9px;cursor:pointer}
+.fbtn.go{margin-top:10px;background:var(--accent);color:var(--accent-fg);border-color:transparent;min-height:38px;padding:8px 16px}
 
 /* recorrido */
 #tour{position:fixed;z-index:7;left:max(16px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 86px);
@@ -218,6 +219,7 @@ h3{margin:0 0 6px;font:700 .72rem var(--body);letter-spacing:.14em;text-transfor
     <div>
       <div class="eyebrow" id="fKind"></div>
       <h2 id="fName"></h2>
+      <button class="fbtn go" id="fGo" hidden>🚶 Ir allí</button>
     </div>
     <div class="year"><b id="fYear"></b><span id="fYearNote"></span></div>
     <div><h3>Medidas</h3><table class="meas" id="fMeas"></table></div>
@@ -1004,12 +1006,14 @@ function openFicha(pid){
   $('#fMats').innerHTML=I.mats.map(k=>`<span class="chip"><i style="background:${MAT[k][1]}"></i>${MAT[k][0]}</span>`).join('');
   $('#fFact').textContent=I.fact;
   $('#fDoorBtn').hidden=!I.door;
+  {const s=SPOTS[pid];$('#fGo').hidden=!s||mode==='tour'||Math.hypot(camera.position.x-s[0],camera.position.z-s[2])<8;}
   ficha.classList.remove('hide');ficha.classList.remove('flash');void ficha.offsetWidth;ficha.classList.add('flash');
   ficha.scrollTop=0;fichaPid=pid;hideHint();
 }
 function closeFicha(){ficha.classList.add('hide');clearSel();fichaPid=null;}
 $('#closeF').onclick=closeFicha;
 $('#fDoorBtn').onclick=()=>setDoor(!doorOpen);
+$('#fGo').onclick=()=>{if(fichaPid)goToSpot(fichaPid);};
 
 /* ---------- Puerta / fuentes / noche ---------- */
 function setDoor(o){doorOpen=o;const b=$('#tDoor');b.setAttribute('aria-pressed',o);b.querySelector('span').textContent=o?'Cerrar puerta':'Abrir puerta';}
@@ -1165,13 +1169,31 @@ function planRoute(a,b){
   else if(za>zb){if(za===2){add(DOOR_IN);add(DOOR_OUT);}if(za>=1&&zb<=.5)add(STAIR_HI);if(zb===0)add(STAIR_LO);}
   add(new V3(b.x,b.y,b.z));return pts;}
 /* destino lejano: vuelo rápido en arco (por encima de muros y escaleras) y se sigue caminando allí */
-function glideTo(land,ringPt,done){
+function glideTo(land,ringPt,done,pitch=-.05){
   const p=camera.position,dx=land.x-p.x,dz=land.z-p.z,l=Math.hypot(dx,dz)||1;const yaw=Math.atan2(-dx,-dz);
   W.dest=null;W.path=null;placeRing(ringPt,'dest');
   const fw=new V3();camera.getWorldDirection(fw);controls.target.copy(p).addScaledVector(fw,10);
-  flyTo([land.x,land.y+1.7,land.z],[land.x+dx/l*30,land.y+1.5,land.z+dz/l*30],Math.min(2.4,.7+l/90),()=>{
-    W.feet=land.y;W.yaw=yaw;W.pitch=-.05;camera.rotation.set(W.pitch,W.yaw,0);
+  flyTo([land.x,land.y+1.7,land.z],[land.x+dx/l*30,land.y+1.7+Math.tan(pitch)*30,land.z+dz/l*30],Math.min(2.4,.7+l/90),()=>{
+    W.feet=land.y;W.yaw=yaw;W.pitch=pitch;camera.rotation.set(W.pitch,W.yaw,0);
     if(done)done();else{ringMode='fade';ringT=performance.now();}},ease,Math.min(30,l*.12));}
+/* "Ir allí" de la ficha: punto donde quedas de pie y hacia dónde miras [x, piso, z, yaw] (yaw 0 = mirar al norte) */
+const MAUS_FRONT=[0,PLH,PLZ+H+18,0,.32],INSIDE_SPOT=[0,PLH,PLZ+7.6,0];
+const SPOTS={gate:[0,0,188,0],garden:[6.5,0,136,0],cypress:[6.5,0,100,0],canals:[6.5,0,60,0],tank:[6.5,0,24,0],
+  plinth:[5,0,PLZ+66,0],mausoleum:MAUS_FRONT,dome:MAUS_FRONT,finial:MAUS_FRONT,chhatri:MAUS_FRONT,doors:MAUS_FRONT,
+  chamber:INSIDE_SPOT,cenMM:INSIDE_SPOT,cenSJ:INSIDE_SPOT,jali:INSIDE_SPOT,
+  mosque:[-80,0,PLZ,Math.PI/2],jawab:[80,0,PLZ,-Math.PI/2]};
+for(const sx of[-1,1])for(const sz of[-1,1])SPOTS['min'+sx+sz]=[sx*34,PLH,PLZ+sz*34,Math.atan2(-sx,-sz)];
+function goToSpot(pid){const s=SPOTS[pid];if(!s)return;closeFicha();hideWelcome();
+  const [x,f,z,yaw]=s,pt=new V3(x,f,z);
+  if(mode==='tour')endTour(false);
+  if(zoneOf(x,f,z)===2){setDoor(true); // interior: se llega a la puerta y se entra caminando
+    if(mode==='walk'){walkTo(pt);return;}
+    if(inside){startWalkAt(camera.position.x,PLH,camera.position.z,0,-.1);walkTo(pt);return;}
+    flyTo([DOOR_OUT.x,PLH+1.7,DOOR_OUT.z],[0,PLH+1.2,PLZ],reduce?.3:2.2,()=>{startWalkAt(DOOR_OUT.x,PLH,DOOR_OUT.z,0,-.05);walkTo(pt);});return;}
+  const l=Math.hypot(x-camera.position.x,z-camera.position.z);
+  if(mode!=='walk'){placeRing(pt,'dest');
+    flyTo([x,f+1.7,z],[x-Math.sin(yaw)*30,f+1.7+Math.tan(s[4]||-.03)*30,z-Math.cos(yaw)*30],reduce?.3:Math.min(2.6,.8+l/90),()=>{startWalkAt(x,f,z,yaw,s[4]||-.03);ringMode='fade';ringT=performance.now();},ease,Math.min(30,l*.12));return;}
+  glideTo(pt,pt,()=>{W.yaw=yaw;W.pitch=s[4]||-.03;camera.rotation.set(W.pitch,W.yaw,0);ringMode="fade";ringT=performance.now();},s[4]||-.03);}
 function walkTo(pt){
   const zt=zoneOf(pt.x,pt.y,pt.z),zh=zoneOf(camera.position.x,W.feet,camera.position.z);
   const land=zt===2?DOOR_OUT:new V3(pt.x,pt.y,pt.z); // al interior se aterriza en la puerta y se entra caminando
